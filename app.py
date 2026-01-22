@@ -1,5 +1,11 @@
 import streamlit as st
 import pandas as pd
+import requests
+
+# -------------------------------------------------
+# CONFIG
+# -------------------------------------------------
+WEBHOOK_URL = "https://rahulllllllllllllllll.app.n8n.cloud/webhook/8d91510a-69e7-4380-9653-120ccac05906"
 
 st.set_page_config(
     page_title="False News Detection AI Agent",
@@ -7,68 +13,73 @@ st.set_page_config(
     layout="centered"
 )
 
+# -------------------------------------------------
+# UI
+# -------------------------------------------------
 st.title("📰 False News Detection AI Agent")
 
 st.markdown("""
-This system verifies a news claim **only using the Excel content column**.
+You are interacting with an **AI verification agent**.
 
-**Decision rules**
-- TRUE → claim matches content  
-- FALSE → claim contradicts content  
-- NOT FOUND → claim not present  
+**Rules followed:**
+- Only Excel `content` column is trusted  
+- No outside knowledge  
+- Verdict: TRUE / FALSE / NOT FOUND  
 """)
 
-# Upload Excel
+# -------------------------------------------------
+# INPUTS
+# -------------------------------------------------
 uploaded_file = st.file_uploader(
     "Upload verified financial news Excel file",
     type=["xlsx"]
 )
 
-# Input claim
 claim = st.text_area(
-    "Enter the news claim",
+    "Enter news claim",
     placeholder="Example: RBI increased repo rate by 25 basis points"
 )
 
-if uploaded_file and claim:
+# -------------------------------------------------
+# VERIFY BUTTON
+# -------------------------------------------------
+if st.button("Verify Claim"):
 
-    df = pd.read_excel(uploaded_file)
-
-    # Ensure required columns exist
-    if "content" not in df.columns or "date" not in df.columns:
-        st.error("Excel must contain: date, content, summary columns")
+    if not uploaded_file or not claim:
+        st.warning("Please upload Excel file and enter a claim.")
     else:
-        claim_lower = claim.lower()
+        try:
+            # Read Excel
+            df = pd.read_excel(uploaded_file)
 
-        found_match = False
-        contradiction = False
-        evidence_rows = []
+            if "content" not in df.columns or "date" not in df.columns:
+                st.error("Excel must contain: date and content columns.")
+            else:
+                # Convert Excel to JSON for n8n
+                records = df[["date", "content"]].to_dict(orient="records")
 
-        for _, row in df.iterrows():
-            content_text = str(row["content"]).lower()
+                payload = {
+                    "claim": claim,
+                    "news_data": records
+                }
 
-            # Simple matching logic (basic version)
-            if claim_lower in content_text:
-                found_match = True
-                evidence_rows.append(row)
+                with st.spinner("Verifying with AI Agent..."):
+                    response = requests.post(
+                        WEBHOOK_URL,
+                        json=payload,
+                        timeout=90
+                    )
 
-        # Decision logic
-        if found_match:
-            verdict = "TRUE"
-        else:
-            verdict = "NOT FOUND"
+                result = response.json()
 
-        st.subheader("🧠 Verdict")
-        st.success(f"Verdict: {verdict}")
+                # -------------------------------------------------
+                # OUTPUT
+                # -------------------------------------------------
+                st.subheader("🧠 Verdict")
+                st.success(f"Verdict: {result.get('verdict', 'N/A')}")
 
-        st.subheader("📌 Evidence")
+                st.subheader("📌 Evidence")
+                st.write(result.get("evidence", "No evidence returned."))
 
-        if verdict == "TRUE":
-            for row in evidence_rows:
-                st.markdown(f"""
-**Date:** {row['date']}  
-**Content Reference:**  
-{row['content']}
-""")
-        else:
-            st.write("No matching content found in the Excel data.")
+        except Exception as e:
+            st.error(f"Error communicating with verification agent: {e}")
