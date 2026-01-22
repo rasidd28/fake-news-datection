@@ -4,7 +4,7 @@ import requests
 # -------------------------------------------------
 # CONFIG
 # -------------------------------------------------
-WEBHOOK_URL = "https://rahulllllllllllllllll.app.n8n.cloud/webhook/8d91510a-69e7-4380-9653-120ccac05906"
+WEBHOOK_URL = "https://rahulllllllllllllllll.app.n8n.cloud/webhook-test/8d91510a-69e7-4380-9653-120ccac05906"
 
 st.set_page_config(
     page_title="Conversational AI Assistant",
