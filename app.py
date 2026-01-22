@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 import requests
 
 # -------------------------------------------------
@@ -8,78 +7,80 @@ import requests
 WEBHOOK_URL = "https://rahulllllllllllllllll.app.n8n.cloud/webhook/8d91510a-69e7-4380-9653-120ccac05906"
 
 st.set_page_config(
-    page_title="False News Detection AI Agent",
-    page_icon="📰",
+    page_title="Conversational AI Assistant",
+    page_icon="💬",
     layout="centered"
 )
 
 # -------------------------------------------------
-# UI
+# SESSION STATE
 # -------------------------------------------------
-st.title("📰 False News Detection AI Agent")
-
-st.markdown("""
-You are interacting with an **AI verification agent**.
-
-**Rules followed:**
-- Only Excel `content` column is trusted  
-- No outside knowledge  
-- Verdict: TRUE / FALSE / NOT FOUND  
-""")
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
 # -------------------------------------------------
-# INPUTS
+# UI HEADER
 # -------------------------------------------------
-uploaded_file = st.file_uploader(
-    "Upload verified financial news Excel file",
-    type=["xlsx"]
-)
-
-claim = st.text_area(
-    "Enter news claim",
-    placeholder="Example: RBI increased repo rate by 25 basis points"
-)
+st.title("💬 Conversational AI Assistant")
+st.caption("Friendly • Helpful • Natural conversation")
 
 # -------------------------------------------------
-# VERIFY BUTTON
+# CHAT HISTORY
 # -------------------------------------------------
-if st.button("Verify Claim"):
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-    if not uploaded_file or not claim:
-        st.warning("Please upload Excel file and enter a claim.")
-    else:
-        try:
-            # Read Excel
-            df = pd.read_excel(uploaded_file)
+# -------------------------------------------------
+# USER INPUT
+# -------------------------------------------------
+user_input = st.chat_input("Type your message...")
 
-            if "content" not in df.columns or "date" not in df.columns:
-                st.error("Excel must contain: date and content columns.")
-            else:
-                # Convert Excel to JSON for n8n
-                records = df[["date", "content"]].to_dict(orient="records")
+if user_input:
 
-                payload = {
-                    "claim": claim,
-                    "news_data": records
-                }
+    # Add user message
+    st.session_state.messages.append({
+        "role": "user",
+        "content": user_input
+    })
 
-                with st.spinner("Verifying with AI Agent..."):
-                    response = requests.post(
-                        WEBHOOK_URL,
-                        json=payload,
-                        timeout=90
-                    )
+    with st.chat_message("user"):
+        st.markdown(user_input)
 
-                result = response.json()
+    # -------------------------------------------------
+    # SEND TO n8n
+    # -------------------------------------------------
+    payload = {
+        "message": user_input,
+        "conversation": st.session_state.messages
+    }
 
-                # -------------------------------------------------
-                # OUTPUT
-                # -------------------------------------------------
-                st.subheader("🧠 Verdict")
-                st.success(f"Verdict: {result.get('verdict', 'N/A')}")
+    try:
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                response = requests.post(
+                    WEBHOOK_URL,
+                    json=payload,
+                    timeout=90
+                )
 
-                st.subheader("📌 Evidence")
-                st.write(result.get("evidence", "No evidence returned."))
+            result = response.json()
 
-        except Exception as e:
-            st.error(f"Error communicating with verification agent: {e}")
+            assistant_reply = result.get(
+                "reply",
+                "Sorry, I couldn’t generate a response right now."
+            )
+
+    except Exception as e:
+        assistant_reply = f"⚠️ Something went wrong. Please try again."
+
+    # -------------------------------------------------
+    # DISPLAY ASSISTANT MESSAGE
+    # -------------------------------------------------
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": assistant_reply
+    })
+
+    with st.chat_message("assistant"):
+        st.markdown(assistant_reply)
